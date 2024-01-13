@@ -1,6 +1,7 @@
 use crate::fs_node::*;
+use std::{io, hash::Hash, path::PathBuf, fs::{metadata, Metadata}};
 use serde::{Deserialize, Serialize};
-use std::{io, hash::Hash, path::PathBuf};
+use walkdir::{WalkDir, Error};
 use simplicio::*;
 
 #[derive(Debug)]
@@ -10,6 +11,7 @@ pub enum WatcherError {
     InvalidDirectoryName,
     IOError(io::Error),
     NodeError(FsNodeError),
+    WalkDirError(Error),
 }
 
 impl std::fmt::Display for WatcherError {
@@ -20,6 +22,7 @@ impl std::fmt::Display for WatcherError {
             WatcherError::InvalidDirectoryName => write!(f, "Invalid directory name"),
             WatcherError::IOError(e) => write!(f, "{}", e),
             WatcherError::NodeError(e) => write!(f, "{}", e),
+            WatcherError::WalkDirError(e) => write!(f, "{}", e),
         }
     }
 }
@@ -118,6 +121,18 @@ where
         return self;
     }
 
+    pub fn walk(&mut self) -> Result<&mut Watcher<K, V>, WatcherError> {
+        self.dir_info.content = match dir_recurse(
+            &self.path, self.ignore_hidden, &self.ignore_list
+        ) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+
+        return Ok(self);
+    }
+
+
     pub fn save(&self) -> io::Result<()> {
         let mut path = self.path.clone();
         path.push(".watcher");
@@ -146,3 +161,85 @@ where
     }
 }
 
+fn dir_recurse<K, V>(
+    path: &PathBuf, ignore_hidden: bool, ignore_list: &[String]
+) -> Result<Vec<FsNode<K, V>>, WatcherError> 
+where 
+    K: Hash + Eq + Clone + Serialize + for<'de> Deserialize<'de>, 
+    V: Clone + Serialize + for<'de> Deserialize<'de>
+{
+    let mut content: Vec<FsNode<K, V>> = vec![];
+
+    let walkdir = WalkDir::new(path)
+        .min_depth(1).into_iter().filter_entry(|entry| {
+            let mut skip = true;
+            entry.path().file_name().unwrap().to_str()
+                .map(|s| skip = !ignore_list.contains(&s.to_string()));
+            skip
+        });
+    for entry in walkdir.filter(|e| e.is_ok()) {
+        // println!("meep: {:?}", &entry);
+        let node = entry.unwrap();
+
+        let name = match node.file_name().to_str() {
+            Some(n) => n,
+            None => return Err(WatcherError::PathDoesNotExist),
+        };
+
+        let metadata = match metadata(node.path()) {
+            Ok(m) => m,
+            Err(e) => return Err(WatcherError::IOError(e)),
+        };
+
+        if is_hidden(&name, &metadata) {
+            continue;
+        }
+
+        let last_modified = match metadata.modified() {
+            Ok(time) => time,
+            Err(e) => return Err(WatcherError::IOError(e)),
+        };
+
+        content.push(match node.path().is_dir() {
+            true => {
+                let sub_path = PathBuf::from(node.path());
+                let content = match dir_recurse(&sub_path, ignore_hidden, ignore_list) {
+                    Ok(c) => c,
+                    Err(e) => return Err(e)
+                };
+                FsNode::Directory(DirInfo { 
+                    name: s!(name), 
+                    path: sub_path, 
+                    last_modified: Some(last_modified), 
+                    expanded: true, 
+                    content,
+                    fields: None, 
+                })
+            },
+            false => {
+                FsNode::File(FileInfo {
+                    name: s!(name),
+                    path: PathBuf::from(node.path()),
+                    last_modified: Some(last_modified),
+                    fields: None,
+                })
+            },
+        });
+    }
+
+
+    return Ok(content);
+}
+
+#[allow(unused_variables)]
+fn is_hidden(name: &str, metadata: &Metadata) -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        return name.starts_with('.');
+    }
+    #[cfg(target_os = "windows")]
+    {
+        return metadata.map(|m| m.file_attributes() & 0x2 != O)
+        .unwrap_or(false);
+    }
+}

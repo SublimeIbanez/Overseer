@@ -1,5 +1,5 @@
 [package]
-name = "path_creep"
+name = "overseer"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,3 +10,5 @@ bincode = "1.3.3"
 dekor = "0.1.0"
 serde = { version = "1", features = ["derive"] }
 simplicio = "0.1.3"
+tokio = "1.35.1"
+walkdir = "2.4.0"
