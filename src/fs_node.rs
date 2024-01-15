@@ -13,6 +13,11 @@ pub enum FsNodeError {
     InvalidName,
 }
 
+pub struct Field<K, V> where K: Clone, V: Clone {
+    pub key: K,
+    pub value: V,
+}
+
 impl std::fmt::Display for FsNodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
