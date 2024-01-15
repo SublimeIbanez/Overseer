@@ -1,9 +1,11 @@
 use crate::fs_node::*;
 use std::{io, hash::Hash, marker::Send, path::PathBuf, fs::Metadata};
 use serde::{Deserialize, Serialize};
+use async_recursion::async_recursion;
 use simplicio::*;
 use tokio::fs;
-use async_recursion::async_recursion;
+#[cfg(target_os = "windows")]
+use std::os::windows::fs::MetadataExt;
 
 #[derive(Debug)]
 pub enum WatcherError {
@@ -140,6 +142,10 @@ where
         return Ok(self);
     }
 
+    pub fn build_tree(&self) -> Vec<String> {
+        return self.dir_info.build_tree();
+    }
+
     pub fn save(&self) -> io::Result<()> {
         let mut path = self.path.clone();
         path.push(".watcher");
@@ -183,7 +189,10 @@ where
         Err(e) => return Err(WatcherError::IOError(e)),
     };
 
-    let dir_metadata = path.metadata().unwrap();
+    let dir_metadata = match path.metadata() {
+        Ok(md) => md,
+        Err(e) => return Err(WatcherError::IOError(e)),
+    };
 
     while let Some(entry) = match dir.next_entry().await {
         Ok(entry) => entry,
@@ -227,10 +236,25 @@ where
             }
         });
     }
+    let dir_name = match path.file_name() {
+        Some(n) => {
+            match n.to_str() {
+                Some(dirn) => dirn.to_string(),
+                None => return Err(WatcherError::PathDoesNotExist),
+            }
+        },
+        None => return Err(WatcherError::PathDoesNotExist),
+    };
+
+    let last_modified = match dir_metadata.modified() {
+        Ok(lm) => Some(lm),
+        Err(e) => return Err(WatcherError::IOError(e)),
+    };
+    
     Ok(DirInfo { 
-        name: path.file_name().unwrap().to_str().unwrap().to_string(), 
+        name: dir_name, 
         path: path.to_owned(), 
-        last_modified: Some(dir_metadata.modified().unwrap()),
+        last_modified,
         expanded: true, 
         content, 
         fields: Some(map!()), 
@@ -240,8 +264,8 @@ where
 #[allow(unused_variables)]
 fn is_hidden(name: &str, metadata: &Metadata) -> bool {
     if name.starts_with('.') { return true; }
-    if cfg!(target_os = "windows") {
-        #[cfg(target_os = "windows")]
+    #[cfg(target_os = "windows")]
+    {
         return (metadata.file_attributes() & 0x2) != 0;
     }
     return false;

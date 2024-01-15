@@ -204,6 +204,21 @@ impl<K, V> DirInfo<K, V> where K: Hash + Eq + Clone, V: Clone {
         return self.into();
     }
 
+    pub fn build_tree(&self) -> Vec<String> {
+        let mut tree: Vec<String> = Vec::new();
+
+        tree.push(s!(
+            "[", 
+            style!(Bold, FGGreen => 
+                if self.expanded { Utf8::ModLetterDownArrowhead }
+                else { Utf8::ModLetterRightArrowhead }), // ˅ ˃
+            "]",
+            style!(Bold, FGBlue => self.name),
+        ));
+        tree_recursion(self, s!(), &mut tree);
+        tree
+    }
+
     pub fn build(&self) -> Self {
         return self.clone();
     }
@@ -303,27 +318,6 @@ impl<K, V> Clone for FileInfo<K, V> where K: Hash + Eq + Clone, V: Clone {
 }
 
 
-
-
-
-
-
-
-pub fn build_tree<K: Hash + Eq + Clone, V: Clone>(dir_info: &DirInfo<K, V>) -> Vec<String> {
-    let mut tree: Vec<String> = Vec::new();
-
-    tree.push(s!(
-        "[", 
-        style!(Bold, FGGreen => 
-            if dir_info.expanded { Utf8::ModLetterDownArrowhead }
-            else { Utf8::ModLetterRightArrowhead }), // ˅ ˃
-        "]",
-        style!(Bold, FGBlue => dir_info.name),
-    ));
-    tree_recursion(dir_info, s!(), &mut tree);
-    tree
-}
-
 fn tree_recursion<K: Hash + Eq + Clone, V: Clone>(
     dir_info: &DirInfo<K, V>, path: String, tree: &mut Vec<String>
 ) {
@@ -362,17 +356,6 @@ fn tree_recursion<K: Hash + Eq + Clone, V: Clone>(
                     "]",
                     style!(Bold, FGBlue => subdir.name),
                 ));
-                // tree.push(format!(
-                //     "{}{}{}{}{}",
-                //     prefix.clone(),
-                //     "[",
-                //     expanded_color
-                //         .paint(if subdir.expanded { "˅" } else { "˃" })
-                //         .to_string()
-                //         .as_str(),
-                //     bracket_color.paint("]").to_string().as_str(),
-                //     dir_color.paint(&subdir.name).to_string().as_str(),
-                // ));
 
                 //Recursively process expanded directories
                 let sub_path = if is_last {
