@@ -13,6 +13,10 @@ pub enum FsNodeError {
     InvalidName,
 }
 
+#[repr(i32)]
+#[derive(Clone, PartialEq, Eq, Serialize, Hash, Deserialize, Debug)]
+pub enum N {N}
+
 pub struct Field<K, V> where K: Clone, V: Clone {
     pub key: K,
     pub value: V,
@@ -314,7 +318,7 @@ fn tree_recursion<K: Hash + Eq + Clone, V: Clone>(
     let joint = format!(" {}{}", 
         Utf8::JointPipeSlim, Utf8::HPipeSlim.repeat(2));
     let node = format!(" {}{}", 
-        Utf8::NodePipeSlim, Utf8::HPipeSlim.repeat(2));
+        Utf8::NodePipeCurved, Utf8::HPipeSlim.repeat(2));
     let vline = format!(" {}  ", Utf8::VPipeSlim);
 
     //Iterate through contents and add them to the tree

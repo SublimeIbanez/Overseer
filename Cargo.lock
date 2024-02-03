@@ -261,6 +261,7 @@ dependencies = [
  "bincode",
  "dekor",
  "futures",
+ "libc",
  "serde",
  "simplicio",
  "tokio",

@@ -1,4 +1,4 @@
-use crate::fs_node::*;
+use crate::{fs_node::*, inotify::*};
 use std::{io, hash::Hash, marker::Send, path::PathBuf, fs::Metadata};
 use serde::{Deserialize, Serialize};
 use async_recursion::async_recursion;
@@ -29,16 +29,13 @@ impl std::fmt::Display for WatcherError {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Watcher<K, V> 
-where 
-    K: Hash + Eq + Clone + Serialize, 
-    V: Clone + Serialize 
-{
+pub struct Watcher<K: Hash + Eq + Clone + Serialize, V: Clone + Serialize> {
     pub dir_name: String,
     pub path: PathBuf,
     pub ignore_hidden: bool,
     pub ignore_list: Vec<String>,
-    pub dir_info: DirInfo<K, V>
+    pub dir_info: DirInfo<K, V>,
+    pub inotify: Option<INotify>,
 }
 
 impl<K, V> Watcher<K, V> 
@@ -46,6 +43,7 @@ where
     K: Hash + Eq + Clone + Send + 'static + Serialize + for<'de> Deserialize<'de>, 
     V: Clone + Serialize + Send + 'static + for<'de> Deserialize<'de>
 {
+    /// new()
     pub fn new(input: &str) -> Result<Self, WatcherError> {
         let path = if input.is_empty() {
             std::env::current_dir().map_err(|_| WatcherError::PathDoesNotExist)?
@@ -71,9 +69,43 @@ where
             ignore_hidden: true,
             ignore_list: vec![],
             dir_info,
+            inotify: None,
         })
     }
 
+    /// config()
+    pub fn config(
+        input: &str, ignore_hidden: bool, ignore_list: Vec<String>
+    ) -> Result<Watcher<K, V>, WatcherError> {
+        let path = if input.is_empty() {
+            std::env::current_dir().map_err(|_| WatcherError::PathDoesNotExist)?
+        } else { PathBuf::from(input) };
+
+        if !path.exists() { return Err(WatcherError::PathDoesNotExist); }
+        if !path.is_dir() { return Err(WatcherError::NotADirectory); }
+
+        let dir_name = if let Some(name) = path.file_name()
+            .and_then(|n| n.to_str()) {
+            name.to_owned()
+        } else {
+            return Err(WatcherError::InvalidDirectoryName);
+        };
+
+        let dir_info: DirInfo<K, V> = DirInfo::new(
+            &s!(path.display()), None, true, vec![], None
+        ).map_err(|e| WatcherError::NodeError(e))?;
+
+        Ok(Self {
+            dir_name,
+            path,
+            ignore_hidden,
+            ignore_list,
+            dir_info,
+            inotify: None,
+        })
+    }
+
+    /// from()
     pub fn from(dir_info: DirInfo<K, V>) -> Result<Watcher<K, V>, WatcherError> {
         let path = if dir_info.path.as_os_str().is_empty() {
             std::env::current_dir().map_err(|_| WatcherError::PathDoesNotExist)?
@@ -95,6 +127,7 @@ where
             ignore_hidden: true,
             ignore_list: vec![],
             dir_info,
+            inotify: None,
         })
     }
 
@@ -126,14 +159,15 @@ where
         let dir_path = self.path.clone();
         let ignore_hidden = self.ignore_hidden;
         let ignore_list = self.ignore_list.clone();
-        println!("boop");
 
         let runtime = match tokio::runtime::Runtime::new() {
             Ok(rt) => rt,
             Err(e) => return Err(WatcherError::IOError(e)),
         };
 
-        let dir_info = match runtime.block_on(dir_recurse_async(&dir_path, ignore_hidden, &ignore_list)) {
+        let dir_info = match runtime.block_on(
+            dir_recurse_async(&dir_path, ignore_hidden, &ignore_list)
+        ) {
             Ok(content) => content,
             Err(e) => return Err(e),
         };
