@@ -35,6 +35,7 @@ pub struct Watcher<K: Hash + Eq + Clone + Serialize, V: Clone + Serialize> {
     pub ignore_hidden: bool,
     pub ignore_list: Vec<String>,
     pub dir_info: DirInfo<K, V>,
+    #[allow(private_interfaces)]
     pub inotify: Option<INotify>,
 }
 
@@ -92,7 +93,7 @@ where
         };
 
         let dir_info: DirInfo<K, V> = DirInfo::new(
-            &s!(path.display()), None, true, vec![], None
+            &s!(path.display()), None, vec![], None
         ).map_err(|e| WatcherError::NodeError(e))?;
 
         Ok(Self {
@@ -346,6 +347,10 @@ fn is_hidden(name: &str, metadata: &Metadata) -> bool {
     {
         return (metadata.file_attributes() & 0x2) != 0;
     }
-    return false;
+    #[cfg(target_os = "linux")]
+    {
+        return false;
+    }
+    
 }
 

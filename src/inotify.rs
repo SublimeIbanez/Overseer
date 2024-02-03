@@ -1,13 +1,17 @@
 extern crate libc;
+#[allow(unused_imports)]
 use core::slice;
+#[cfg(target_os = "linux")]
 use std::{io::{Error, Write}, os::fd::IntoRawFd};
 use serde::{Serialize, Deserialize};
+#[cfg(target_os = "linux")]
 use libc::{
     inotify_init1, 
     IN_NONBLOCK, IN_CLOEXEC, IN_MODIFY, IN_CREATE, IN_ACCESS, 
     IN_ATTRIB, IN_CLOSE_WRITE, IN_CLOSE_NOWRITE, IN_OPEN, 
     IN_MOVED_FROM, IN_MOVED_TO, IN_DELETE, IN_DELETE_SELF, IN_MOVE_SELF, IN_UNMOUNT, IN_Q_OVERFLOW, IN_IGNORED
 };
+#[allow(unused_imports)]
 use simplicio::*;
 
 // TODO: Implement for run-at-startup
@@ -24,41 +28,56 @@ use simplicio::*;
 // Treat this library as a liaison between the daemon and the primary program
 // TODO: Move this code to a small binary to run separately from this library and primary program
 // reeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
-
+#[cfg(target_os = "linux")]
 pub enum INotifyError {
     OSError(Error),
     IOError(Error),
     Utf8Error(std::str::Utf8Error),
 }
 
-
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum Event {
+    #[cfg(target_os = "linux")]
     Access = IN_ACCESS,              // 0x00000001   1
+    #[cfg(target_os = "linux")]
     Modify = IN_MODIFY,              // 0x00000002   2
+    #[cfg(target_os = "linux")]
     Attrib = IN_ATTRIB,              // 0x00000004   4
+    #[cfg(target_os = "linux")]
     CloseWrite = IN_CLOSE_WRITE,     // 0x00000008   8
+    #[cfg(target_os = "linux")]
     CloseNoWrite = IN_CLOSE_NOWRITE, // 0x00000010   16
+    #[cfg(target_os = "linux")]
     Open = IN_OPEN,                  // 0x00000020   32
+    #[cfg(target_os = "linux")]
     MovedFrom = IN_MOVED_FROM,       // 0x00000040   64
+    #[cfg(target_os = "linux")]
     MovedTo = IN_MOVED_TO,           // 0x00000080   128
+    #[cfg(target_os = "linux")]
     Create = IN_CREATE,              // 0x00000100   256
+    #[cfg(target_os = "linux")]
     Delete = IN_DELETE,              // 0x00000200   512
+    #[cfg(target_os = "linux")]
     DeleteSelf = IN_DELETE_SELF,     // 0x00000400   1024
+    #[cfg(target_os = "linux")]
     MoveSelf = IN_MOVE_SELF,         // 0x00000800   2048
+    #[cfg(target_os = "linux")]
     Unmount = IN_UNMOUNT,            // 0x00002000   8192
+    #[cfg(target_os = "linux")]
     Overflow = IN_Q_OVERFLOW,        // 0x00004000   16384
+    #[cfg(target_os = "linux")]
     Ignored = IN_IGNORED,            // 0x00008000   32768
     Uknown = 0,
 }
-
+#[cfg(target_os = "linux")]
 impl std::fmt::Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", *self as u32)
     }
 }
 
+#[cfg(target_os = "linux")]
 impl From<u32> for Event {
     fn from(mask: u32) -> Self {
         match mask {
@@ -87,6 +106,7 @@ impl From<u32> for Event {
     }
 }
 
+#[cfg(target_os = "linux")]
 impl std::ops::BitOr for Event {
     type Output = u32;
 
@@ -94,6 +114,7 @@ impl std::ops::BitOr for Event {
         self | rhs 
     }
 }
+
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct INotify {
@@ -104,6 +125,7 @@ pub(crate) struct INotify {
     pub(crate) watch_ids: Vec<i32>,
 }
 
+#[cfg(target_os = "linux")]
 impl INotify {
     pub(crate) fn new(path: &str) -> Result<Self, INotifyError> {
         let init = unsafe { inotify_init1(IN_NONBLOCK | IN_CLOEXEC) };
