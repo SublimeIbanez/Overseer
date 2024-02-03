@@ -72,14 +72,13 @@ pub struct DirInfo<K, V> where K: Hash + Eq + Clone, V: Clone {
     pub name: String,
     pub path: PathBuf,
     pub last_modified: Option<SystemTime>,
-    pub expanded: bool,
     pub content: Vec<FsNode<K, V>>,
     pub fields: Option<HashMap<K, V>>,
 }
 
 impl<K, V> DirInfo<K, V> where K: Hash + Eq + Clone, V: Clone {
     pub fn new(
-        path: &str, last_modified: Option<SystemTime>, expanded: bool,
+        path: &str, last_modified: Option<SystemTime>,
         content: Vec<FsNode<K, V>>, fields: Option<HashMap<K, V>>
     ) -> Result<Self, FsNodeError> {
         let path = if path.is_empty() {
@@ -99,7 +98,7 @@ impl<K, V> DirInfo<K, V> where K: Hash + Eq + Clone, V: Clone {
             name: s!(name), 
             path, 
             last_modified, 
-            expanded, 
+        
             content, 
             fields,
         })
@@ -123,7 +122,6 @@ impl<K, V> DirInfo<K, V> where K: Hash + Eq + Clone, V: Clone {
             name: s!(name), 
             path, 
             last_modified: None, 
-            expanded: true, 
             content: vec![], 
             fields: None,
         })
@@ -162,21 +160,6 @@ impl<K, V> DirInfo<K, V> where K: Hash + Eq + Clone, V: Clone {
         }
     }
 
-    pub fn expand(&mut self) -> &mut Self {
-        self.expanded = true;
-        return self;
-    }
-
-    pub fn unexpand(&mut self) -> &mut Self {
-        self.expanded = false;
-        return self;
-    }
-
-    pub fn expanded(&mut self, value: bool) -> &mut Self {
-        self.expanded = value;
-        return self;
-    }
-
     pub fn set_content(&mut self, content: Vec<FsNode<K, V>>) -> &mut Self {
         self.content = content;
         return self;
@@ -210,8 +193,7 @@ impl<K, V> DirInfo<K, V> where K: Hash + Eq + Clone, V: Clone {
         tree.push(s!(
             "[", 
             style!(Bold, FGGreen => 
-                if self.expanded { Utf8::ModLetterDownArrowhead }
-                else { Utf8::ModLetterRightArrowhead }), // ˅ ˃
+                Utf8::ModLetterDownArrowhead), // ˅ ˃
             "]",
             style!(Bold, FGBlue => self.name),
         ));
@@ -230,7 +212,6 @@ impl<K, V> Clone for DirInfo<K, V> where K: Hash + Eq + Clone, V: Clone {
             name: s!(self.name),
             path: self.path.clone(),
             last_modified: self.last_modified,
-            expanded: self.expanded,
             content: self.content.clone(),
             fields: self.fields.clone(),
         }
@@ -351,8 +332,7 @@ fn tree_recursion<K: Hash + Eq + Clone, V: Clone>(
                     prefix.clone(),
                     "[", 
                     style!(Bold, FGGreen => 
-                        if dir_info.expanded { Utf8::ModLetterDownArrowhead } 
-                        else { Utf8::ModLetterRightArrowhead }), // ˅ ˃
+                        Utf8::ModLetterDownArrowhead), // ˅ ˃
                     "]",
                     style!(Bold, FGBlue => subdir.name),
                 ));
@@ -363,9 +343,7 @@ fn tree_recursion<K: Hash + Eq + Clone, V: Clone>(
                 } else {
                     path.clone() + &vline
                 };
-                if subdir.expanded {
-                    tree_recursion(subdir, sub_path, tree);
-                }
+                tree_recursion(subdir, sub_path, tree);
             }
         }
     }

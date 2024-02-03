@@ -62,7 +62,7 @@ where
         };
 
         let dir_info: DirInfo<K, V> = DirInfo::new(
-            &s!(path.display()), None, true, vec![], None
+            &s!(path.display()), None, vec![], None
         ).map_err(|e| WatcherError::NodeError(e))?;
 
         Ok(Self {
@@ -174,6 +174,51 @@ where
     }
 }
 
+
+// use std::fs;
+
+// struct FileNode {
+//     path: String,
+//     is_directory: bool,
+// }
+
+// fn walk_file_tree(root_path: &str) {
+//     let mut stack = vec![FileNode {
+//         path: root_path.to_string(),
+//         is_directory: true,
+//     }];
+
+//     while let Some(current_node) = stack.pop() {
+//         if current_node.is_directory {
+//             // Process the directory
+//             println!("Directory: {}", current_node.path);
+
+//             // Get the list of files and directories in the current directory
+//             if let Ok(contents) = fs::read_dir(&current_node.path) {
+//                 // Push directories onto the stack
+//                 for entry in contents {
+//                     if let Ok(entry) = entry {
+//                         let item_path = entry.path();
+//                         let is_directory = item_path.is_dir();
+//                         stack.push(FileNode {
+//                             path: item_path.to_string_lossy().to_string(),
+//                             is_directory,
+//                         });
+//                     }
+//                 }
+//             }
+//         } else {
+//             // Process the file
+//             println!("File: {}", current_node.path);
+//         }
+//     }
+// }
+
+// fn main() {
+//     // Example usage
+//     walk_file_tree("/path/to/root");
+// }
+
 #[async_recursion]
 async fn dir_recurse_async<K, V>(
     path: &PathBuf, ignore_hidden: bool, ignore_list: &[String]
@@ -255,7 +300,6 @@ where
         name: dir_name, 
         path: path.to_owned(), 
         last_modified,
-        expanded: true, 
         content, 
         fields: Some(map!()), 
     })
